@@ -1,25 +1,28 @@
 classdef LTBusDriver
     properties (Constant)
-        DEFAULT_SLAVE_ID = 1;
+        DEFAULT_SLAVE_ID = 0x01;
 
         LT_BUS_READ_FC = 0xAA;
-        LT_BUS_WRITE_FC = 0xEA;
         LT_BUS_READ_RESP_FC = 0xAB;
+        LT_BUS_WRITE_FC = 0xEA;
 
-        LT_BUS_RC_OK = 0;
-        LT_BUS_RC_ERR_UNK_FC = 1;
-        LT_BUS_RC_ERR_INV_CRC16 = 2;
-        LT_BUS_RC_ERR_SLV_ID_MISMATCH = 3;
+        LT_BUS_PACKET_HEADER_SIZE = 7
+        LT_BUS_PACKET_FOOTER_SIZE = 3
 
-        LT_BUS_PACKET_HEADER_SIZE = 3;
-        LT_BUS_PACKET_FOOTER_SIZE = 3;
+        LT_BUS_RC_OK = 0
+        LT_BUS_RC_ERR_PKT_TOO_SMALL = 1
+        LT_BUS_RC_ERR_INV_CRC16 = 2
+        LT_BUS_RC_ERR_SLV_ID_MISMATCH = 3
+        LT_BUS_RC_ERR_UNK_FC = 4
+        LT_BUS_RC_ERR_UNK_DEVICE_BUFFER = 5
+        LT_BUS_RC_ERR_OUT_OF_BOUND_READ = 6
 
         CRC16_POLYNOMIAL = LTBusDriver.initCRC16Table()
     end
 
     methods (Static)
         function crc = compute_crc16(data)
-            crc = uint16(65535); % 0xFFFF
+            crc = 0xFFFF;
             for i = 1:length(data)
                 idx = bitxor(bitand(crc, 255), uint16(data(i))) + 1;
                 crc = bitxor(bitshift(crc, -8), LTBusDriver.CRC16_POLYNOMIAL(idx));
@@ -52,23 +55,24 @@ classdef LTBusDriver
             packet(14) = 0x7D;
         end
 
-        function value = decode_f32(packet)
+        function [rc, value] = decode_f32(packet)
             if packet(3) ~= LTBusDriver.LT_BUS_READ_RESP_FC
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_UNK_FC; return;
             end
 
             packet_crc = typecast(uint8(packet(end-2:end-1)), 'uint16');
             expected_crc = LTBusDriver.compute_crc16(packet(1:end - LTBusDriver.LT_BUS_PACKET_FOOTER_SIZE));
 
             if packet_crc ~= expected_crc
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_INV_CRC16; return;
             end
 
             if packet(2) ~= LTBusDriver.DEFAULT_SLAVE_ID
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_SLV_ID_MISMATCH; return;
             end
 
             val_bytes = packet(LTBusDriver.LT_BUS_PACKET_HEADER_SIZE + (1:4));
+            rc = LTBusDriver.LT_BUS_RC_OK;
             value = typecast(uint8(val_bytes), 'single');
         end
 
@@ -84,23 +88,24 @@ classdef LTBusDriver
             packet(12) = 0x7D;
         end
 
-        function value = decode_u16(packet)
+        function [rc, value] = decode_u16(packet)
             if packet(3) ~= LTBusDriver.LT_BUS_READ_RESP_FC
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_UNK_FC; return;
             end
 
             packet_crc = typecast(uint8(packet(end-2:end-1)), 'uint16');
             expected_crc = LTBusDriver.compute_crc16(packet(1:end - LTBusDriver.LT_BUS_PACKET_FOOTER_SIZE));
 
             if packet_crc ~= expected_crc
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_INV_CRC16; return;
             end
 
             if packet(2) ~= LTBusDriver.DEFAULT_SLAVE_ID
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_SLV_ID_MISMATCH; return;
             end
 
             val_bytes = packet(LTBusDriver.LT_BUS_PACKET_HEADER_SIZE + (1:2));
+            rc = LTBusDriver.LT_BUS_RC_OK;
             value = typecast(uint8(val_bytes), 'uint16');
         end
 
@@ -116,23 +121,24 @@ classdef LTBusDriver
             packet(12) = 0x7D;
         end
 
-        function value = decode_i16(packet)
+        function [rc, value] = decode_i16(packet)
             if packet(3) ~= LTBusDriver.LT_BUS_READ_RESP_FC
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_UNK_FC; return;
             end
 
             packet_crc = typecast(uint8(packet(end-2:end-1)), 'uint16');
             expected_crc = LTBusDriver.compute_crc16(packet(1:end - LTBusDriver.LT_BUS_PACKET_FOOTER_SIZE));
 
             if packet_crc ~= expected_crc
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_INV_CRC16; return;
             end
 
             if packet(2) ~= LTBusDriver.DEFAULT_SLAVE_ID
-                return;
+                rc = LTBusDriver.LT_BUS_RC_ERR_SLV_ID_MISMATCH; return;
             end
 
             val_bytes = packet(LTBusDriver.LT_BUS_PACKET_HEADER_SIZE + (1:2));
+            rc = LTBusDriver.LT_BUS_RC_OK;
             value = typecast(uint8(val_bytes), 'int16');
         end
     end
